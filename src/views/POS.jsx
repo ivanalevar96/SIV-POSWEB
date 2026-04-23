@@ -4,6 +4,7 @@ import { FoodPlaceholder, Logo, Button, Modal, Chip, Toast } from '../ui.jsx';
 import { fmtCLP, nowHM, PAYMENT_METHODS, isCashMethod, methodLabel } from '../data.js';
 import { useProducts, useCategories } from '../hooks/useCatalog.js';
 import { createSale } from '../hooks/useSales.js';
+import { useCashSession, getOpenSession } from '../hooks/useCashSession.js';
 
 export default function POSView({ state, dispatch, onReceipt }) {
   const [cat, setCat] = useState('all');
@@ -16,6 +17,7 @@ export default function POSView({ state, dispatch, onReceipt }) {
 
   const { products, loading: loadingProducts } = useProducts();
   const { categories } = useCategories();
+  const { session: cashSession, reload: reloadCashSession } = useCashSession();
 
   const filtered = products.filter(p =>
     (cat === 'all' || p.cat === cat) &&
@@ -78,7 +80,7 @@ export default function POSView({ state, dispatch, onReceipt }) {
 
       {!isMobile && (
         <aside className="w-[340px] shrink-0 border-l border-black/5 bg-white flex flex-col">
-          <CartPanel state={state} dispatch={dispatch} onCheckout={onReceipt} bumpId={bumpId} setToast={setToast}/>
+          <CartPanel state={state} dispatch={dispatch} onCheckout={onReceipt} bumpId={bumpId} setToast={setToast} cashSession={cashSession} reloadCashSession={reloadCashSession}/>
         </aside>
       )}
 
@@ -102,7 +104,7 @@ export default function POSView({ state, dispatch, onReceipt }) {
             <div className="font-display font-bold text-lg">Carrito ({cartCount})</div>
             <button onClick={()=>setCartOpen(false)} className="w-9 h-9 rounded-full bg-black/5 flex items-center justify-center press"><I.x size={18}/></button>
           </div>
-          <CartPanel state={state} dispatch={dispatch} onCheckout={(sale)=>{ setCartOpen(false); onReceipt(sale); }} bumpId={bumpId} setToast={setToast}/>
+          <CartPanel state={state} dispatch={dispatch} onCheckout={(sale)=>{ setCartOpen(false); onReceipt(sale); }} bumpId={bumpId} setToast={setToast} cashSession={cashSession} reloadCashSession={reloadCashSession}/>
         </div>
       )}
 
@@ -178,7 +180,7 @@ function ProductCard({ p, onPick, bumping, categories }) {
   );
 }
 
-function CartPanel({ state, dispatch, onCheckout, bumpId, setToast }) {
+function CartPanel({ state, dispatch, onCheckout, bumpId, setToast, cashSession, reloadCashSession }) {
   const [method, setMethod] = useState('efectivo');
   const [recibido, setRecibido] = useState('');
   const [saving, setSaving] = useState(false);
@@ -188,11 +190,20 @@ function CartPanel({ state, dispatch, onCheckout, bumpId, setToast }) {
   const isCash = isCashMethod(method);
   const enough = !isCash || recibidoNum >= total;
   const empty = state.cart.length === 0;
+  const noSession = !cashSession;
 
   const finalize = async () => {
     if (empty || !enough || saving) return;
     setSaving(true);
     try {
+      // Re-chequear caja abierta en tiempo real (por si la cerró otro usuario).
+      const current = await getOpenSession();
+      if (!current) {
+        reloadCashSession?.();
+        setToast?.('La caja fue cerrada. No se puede registrar la venta.');
+        return;
+      }
+
       const sale = await createSale({
         items: state.cart,
         method,
@@ -211,6 +222,7 @@ function CartPanel({ state, dispatch, onCheckout, bumpId, setToast }) {
       setRecibido('');
     } catch (err) {
       console.error(err);
+      if (err.message?.includes('No hay caja abierta')) reloadCashSession?.();
       setToast?.('Error: ' + (err.message || 'no se pudo guardar'));
     } finally {
       setSaving(false);
@@ -311,8 +323,15 @@ function CartPanel({ state, dispatch, onCheckout, bumpId, setToast }) {
             </div>
           )}
 
-          <Button size="lg" variant={enough?'dark':'outline'} disabled={!enough || saving} onClick={finalize} className="w-full">
-            <I.check size={18}/> {saving ? 'Guardando…' : `Finalizar venta · ${fmtCLP(total)}`}
+          {noSession && (
+            <div className="rounded-xl p-3 text-xs font-semibold"
+              style={{background:'rgba(220,38,38,0.08)', color:'var(--tomato-deep)'}}>
+              <div className="font-display font-bold">Caja cerrada</div>
+              <div className="font-normal opacity-80">No se pueden registrar ventas hasta que se abra la caja.</div>
+            </div>
+          )}
+          <Button size="lg" variant={enough && !noSession?'dark':'outline'} disabled={!enough || saving || noSession} onClick={finalize} className="w-full">
+            <I.check size={18}/> {saving ? 'Guardando…' : noSession ? 'Caja cerrada' : `Finalizar venta · ${fmtCLP(total)}`}
           </Button>
         </div>
       )}
@@ -356,7 +375,7 @@ export function Receipt({ sale, onClose }) {
           <Button variant="dark" className="flex-[2]" onClick={onClose}>Nueva venta <I.plus size={16}/></Button>
         </div>
         <div className="text-center text-[10px] font-mono py-3 border-t border-dashed border-black/15" style={{color:'var(--ink-mute)'}}>
-          {sale.cashier} · {sale.time} · gracias por preferirnos 🌭
+          {sale.cashier} · {sale.time} · Donde la Grob
         </div>
       </div>
     </Modal>

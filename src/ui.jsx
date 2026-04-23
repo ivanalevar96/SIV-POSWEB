@@ -46,7 +46,7 @@ export function Logo({ size = 28, showText = true }) {
       {showText && (
         <div className="leading-none">
           <div className="font-display font-bold text-[15px]">SVI</div>
-          <div className="text-[10px] uppercase tracking-[0.15em]" style={{color:'var(--ink-mute)'}}>pos completos</div>
+          <div className="text-[10px] uppercase tracking-[0.15em]" style={{color:'var(--ink-mute)'}}>Donde la Grob</div>
         </div>
       )}
     </div>

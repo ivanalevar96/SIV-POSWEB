@@ -60,15 +60,15 @@ async function nextSaleCode() {
  * payload = { items: [{id, name, qty, price, size_name?}], method, total, recibido?, vuelto?, cashier_name }
  */
 export async function createSale(payload) {
-  const code = await nextSaleCode();
-  const { data: user } = await supabase.auth.getUser();
-  const cashierId = user?.user?.id || null;
-
-  // Asociar a la sesión de caja actualmente abierta
+  // Validar primero que exista una caja abierta: sin caja no se permite ninguna venta.
   const openSession = await getOpenSession();
   if (!openSession) {
     throw new Error('No hay caja abierta. Abre caja antes de registrar ventas.');
   }
+
+  const code = await nextSaleCode();
+  const { data: user } = await supabase.auth.getUser();
+  const cashierId = user?.user?.id || null;
 
   const { data: sale, error: saleErr } = await supabase
     .from('sales')
