@@ -1,22 +1,35 @@
 import { useState, useEffect, useRef } from 'react';
 import { I } from './icons.jsx';
 
-export function FoodPlaceholder({ label, color = 'mustard', className = '' }) {
+export function FoodPlaceholder({ label, color = 'mustard', className = '', img }) {
+  const [failed, setFailed] = useState(false);
   const palette = {
     tomato:  ['oklch(0.78 0.14 25)',  'oklch(0.72 0.17 25)'],
     mustard: ['oklch(0.88 0.14 85)',  'oklch(0.82 0.17 85)'],
     pickle:  ['oklch(0.8 0.12 145)',  'oklch(0.74 0.15 145)'],
     cream:   ['oklch(0.92 0.03 70)',  'oklch(0.86 0.05 70)'],
   }[color] || ['oklch(0.88 0.14 85)', 'oklch(0.82 0.17 85)'];
+  const showImg = img && !failed;
   return (
-    <div className={`relative overflow-hidden ${className}`} style={{
+    <div className={`relative overflow-hidden ${className}`} style={showImg ? undefined : {
       background: `repeating-linear-gradient(45deg, ${palette[0]} 0 10px, ${palette[1]} 10px 20px)`
     }}>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-black/50 bg-white/75 px-1.5 py-0.5 rounded">
-          {label}
-        </span>
-      </div>
+      {showImg && (
+        <img
+          src={img}
+          alt={label}
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      )}
+      {!showImg && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-black/50 bg-white/75 px-1.5 py-0.5 rounded">
+            {label}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

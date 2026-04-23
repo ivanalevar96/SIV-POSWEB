@@ -6,29 +6,46 @@ export const CATEGORIES = [
   { id: 'extras', name: 'Extras', emoji: '✨', color: 'mustard' },
 ];
 
+const UNSPLASH = (id) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=500&q=75`;
+
 export const PRODUCTS = [
-  { id: 'p1',  name: 'Completo Italiano',   cat: 'completos', desc: 'Palta, tomate, mayo casera', stock: 42, price: 3500, tag: 'Más pedido' },
-  { id: 'p2',  name: 'Completo Dinámico',   cat: 'completos', desc: 'Palta, tomate, mayo, chucrut', stock: 38, price: 3800 },
-  { id: 'p3',  name: 'As Chacarero',        cat: 'completos', desc: 'Carne, tomate, poroto verde, ají verde', stock: 25, price: 4900, tag: 'Picante' },
-  { id: 'p4',  name: 'Vienesa XL',          cat: 'completos', desc: 'Vienesa premium, pan artesanal', stock: 60, price: 2900 },
-  { id: 'p5',  name: 'Papas Fritas',        cat: 'papas',     desc: 'Corte grueso, crujientes', stock: 80, sizes: [
+  { id: 'p1',  name: 'Completo Italiano',   cat: 'completos', desc: 'Palta, tomate, mayo casera', stock: 42, price: 3500, tag: 'Más pedido',
+    img: UNSPLASH('photo-1619740455993-9e612b1af08a') },
+  { id: 'p2',  name: 'Completo Dinámico',   cat: 'completos', desc: 'Palta, tomate, mayo, chucrut', stock: 38, price: 3800,
+    img: UNSPLASH('photo-1612392062798-2ea0aea3bff0') },
+  { id: 'p3',  name: 'As Chacarero',        cat: 'completos', desc: 'Carne, tomate, poroto verde, ají verde', stock: 25, price: 4900, tag: 'Picante',
+    img: UNSPLASH('photo-1568901346375-23c9450c58cd') },
+  { id: 'p4',  name: 'Vienesa XL',          cat: 'completos', desc: 'Vienesa premium, pan artesanal', stock: 60, price: 2900,
+    img: UNSPLASH('photo-1612392061787-2d078b3e573b') },
+  { id: 'p5',  name: 'Papas Fritas',        cat: 'papas',     desc: 'Corte grueso, crujientes', stock: 80,
+    img: UNSPLASH('photo-1573080496219-bb080dd4f877'),
+    sizes: [
       { name: 'Chica',    price: 2000 },
       { name: 'Mediana',  price: 3000 },
       { name: 'Grande',   price: 4000 },
   ]},
-  { id: 'p6',  name: 'Papas Bravas',        cat: 'papas',     desc: 'Con mayo picante y queso', stock: 45, sizes: [
+  { id: 'p6',  name: 'Papas Bravas',        cat: 'papas',     desc: 'Con mayo picante y queso', stock: 45,
+    img: UNSPLASH('photo-1639024471283-03518883512d'),
+    sizes: [
       { name: 'Mediana',  price: 3800 },
       { name: 'Grande',   price: 4800 },
   ]},
-  { id: 'p7',  name: 'Anillos de Cebolla',  cat: 'papas',     desc: 'Apanados, 8 unidades', stock: 30, price: 3200 },
-  { id: 'p8',  name: 'Bebida en Lata',      cat: 'bebidas',   desc: 'Coca, Sprite, Fanta', stock: 120, price: 1500 },
-  { id: 'p9',  name: 'Jugo Natural',        cat: 'bebidas',   desc: 'Frambuesa, piña, naranja', stock: 50, sizes: [
+  { id: 'p7',  name: 'Anillos de Cebolla',  cat: 'papas',     desc: 'Apanados, 8 unidades', stock: 30, price: 3200,
+    img: UNSPLASH('photo-1639024471283-03518883512d') },
+  { id: 'p8',  name: 'Bebida en Lata',      cat: 'bebidas',   desc: 'Coca, Sprite, Fanta', stock: 120, price: 1500,
+    img: UNSPLASH('photo-1629203851122-3726ecdf080e') },
+  { id: 'p9',  name: 'Jugo Natural',        cat: 'bebidas',   desc: 'Frambuesa, piña, naranja', stock: 50,
+    img: UNSPLASH('photo-1600271886742-f049cd451bba'),
+    sizes: [
       { name: 'Vaso',     price: 1800 },
       { name: 'Jarra',    price: 4500 },
   ]},
-  { id: 'p10', name: 'Agua Mineral',        cat: 'bebidas',   desc: 'Con/sin gas', stock: 80, price: 1200 },
-  { id: 'p11', name: 'Cerveza Artesanal',   cat: 'bebidas',   desc: 'Rubia, negra, IPA', stock: 24, price: 3500, tag: '+18' },
-  { id: 'p12', name: 'Salsa Extra',         cat: 'extras',    desc: 'Ají, mayo, ketchup, mostaza', stock: 200, price: 500 },
+  { id: 'p10', name: 'Agua Mineral',        cat: 'bebidas',   desc: 'Con/sin gas', stock: 80, price: 1200,
+    img: UNSPLASH('photo-1560526860-1f0e56046c85') },
+  { id: 'p11', name: 'Cerveza Artesanal',   cat: 'bebidas',   desc: 'Rubia, negra, IPA', stock: 24, price: 3500, tag: '+18',
+    img: UNSPLASH('photo-1608270586620-248524c67de9') },
+  { id: 'p12', name: 'Salsa Extra',         cat: 'extras',    desc: 'Ají, mayo, ketchup, mostaza', stock: 200, price: 500,
+    img: UNSPLASH('photo-1472476443507-c7a5948772fc') },
 ];
 
 export const HOURS = ['11','12','13','14','15','16','17','18','19','20','21','22'];

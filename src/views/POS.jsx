@@ -105,7 +105,7 @@ export default function POSView({ state, dispatch, onReceipt }) {
         <Modal open onClose={()=>setSizeModal(null)} position={isMobile?'bottom':'center'}
           className={isMobile?'w-full rounded-t-3xl bg-white p-5':'w-[420px] rounded-3xl bg-white p-6'}>
           <div className="flex items-start gap-4">
-            <FoodPlaceholder label={sizeModal.name} color={CATEGORIES.find(c=>c.id===sizeModal.cat)?.color} className="w-20 h-20 rounded-2xl"/>
+            <FoodPlaceholder label={sizeModal.name} img={sizeModal.img} color={CATEGORIES.find(c=>c.id===sizeModal.cat)?.color} className="w-20 h-20 rounded-2xl"/>
             <div className="flex-1">
               <div className="font-display font-bold text-lg leading-tight">{sizeModal.name}</div>
               <div className="text-xs" style={{color:'var(--ink-mute)'}}>{sizeModal.desc}</div>
@@ -145,7 +145,7 @@ function ProductCard({ p, onPick, bumping }) {
   return (
     <button onClick={()=>onPick(p)} className={`press group text-left bg-white rounded-2xl overflow-hidden border border-black/5 hover:border-[color:var(--mustard)] hover:shadow-lg transition-all ${bumping ? 'bump' : ''}`}>
       <div className="relative">
-        <FoodPlaceholder label={p.name} color={cat?.color} className="aspect-[5/4]"/>
+        <FoodPlaceholder label={p.name} img={p.img} color={cat?.color} className="aspect-[5/4]"/>
         {p.tag && (
           <span className="absolute top-2 left-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full text-white" style={{background:'var(--ink)'}}>{p.tag}</span>
         )}

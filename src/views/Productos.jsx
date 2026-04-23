@@ -45,7 +45,7 @@ export default function Productos({ state }) {
             const low = p.stock < 30;
             return (
               <div key={p.id} className="grid grid-cols-[80px_2fr_1fr_1fr_110px_110px_40px] px-4 py-3 border-b border-black/5 items-center hover:bg-black/[0.02]">
-                <FoodPlaceholder label={p.name.split(' ')[0]} color={c.color} className="w-14 h-14 rounded-xl"/>
+                <FoodPlaceholder label={p.name.split(' ')[0]} img={p.img} color={c.color} className="w-14 h-14 rounded-xl"/>
                 <div>
                   <div className="font-semibold">{p.name}</div>
                   <div className="text-xs line-clamp-1" style={{color:'var(--ink-mute)'}}>{p.desc}</div>
@@ -77,7 +77,7 @@ export default function Productos({ state }) {
             const low = p.stock < 30;
             return (
               <Card key={p.id} className="p-3 flex items-center gap-3">
-                <FoodPlaceholder label={p.name.split(' ')[0]} color={c.color} className="w-14 h-14 rounded-xl shrink-0"/>
+                <FoodPlaceholder label={p.name.split(' ')[0]} img={p.img} color={c.color} className="w-14 h-14 rounded-xl shrink-0"/>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <div className="font-semibold text-sm truncate">{p.name}</div>
