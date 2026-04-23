@@ -2,28 +2,87 @@ import { useState } from 'react';
 import { I } from '../icons.jsx';
 import { Logo, Card, Button } from '../ui.jsx';
 import { fmtCLP, nowHM } from '../data.js';
+import { supabase } from '../lib/supabase.js';
+import { getOpenSession, getLastClosingAmount, openCashSession } from '../hooks/useCashSession.js';
 
 export default function LoginView({ onLogin }) {
-  const [user, setUser] = useState('cata.fuentes');
-  const [pass, setPass] = useState('••••••');
+  const [email, setEmail] = useState('');
+  const [pass, setPass] = useState('');
   const [showPass, setShowPass] = useState(false);
-  const [role, setRole] = useState('admin');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [step, setStep] = useState('login');
   const [apertura, setApertura] = useState('50000');
+  const [profile, setProfile] = useState(null); // { first_name, role }
+  const [openedByOther, setOpenedByOther] = useState(null); // nombre de quien abrió
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
+    setError(null);
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const { data, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: pass,
+      });
+      if (signInErr) throw signInErr;
+
+      // Traer perfil (rol + nombre)
+      const { data: prof, error: profErr } = await supabase
+        .from('profiles')
+        .select('first_name, role')
+        .eq('id', data.user.id)
+        .single();
+      if (profErr) throw profErr;
+
+      const first_name = prof?.first_name || (data.user.email?.split('@')[0] ?? 'Usuario');
+      const role = prof?.role || 'cajero';
+      setProfile({ first_name, role });
+
+      // ¿Ya hay caja abierta?
+      const open = await getOpenSession();
+      if (open) {
+        // Alguien ya abrió caja hoy → entrar directo
+        let openedName = null;
+        if (open.opened_by) {
+          const { data: opener } = await supabase
+            .from('profiles')
+            .select('first_name')
+            .eq('id', open.opened_by)
+            .single();
+          openedName = opener?.first_name || 'otro cajero';
+        }
+        setOpenedByOther(openedName);
+        onLogin({ user: first_name, role, apertura: open.opening_amount });
+        return;
+      }
+
+      // No hay caja abierta → sugerir monto del último cierre
+      const lastClose = await getLastClosingAmount();
+      if (lastClose != null) setApertura(String(lastClose));
       setStep('apertura');
-    }, 600);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'No se pudo iniciar sesión');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const finish = () => {
-    const amount = parseInt(apertura.replace(/\D/g,'') || '0', 10);
-    onLogin({ user, role, apertura: amount });
+  const finish = async () => {
+    const amount = parseInt(apertura.replace(/\D/g, '') || '0', 10);
+    try {
+      await openCashSession(amount);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'No se pudo abrir caja');
+      return;
+    }
+    onLogin({
+      user: profile.first_name,
+      role: profile.role,
+      apertura: amount,
+    });
   };
 
   return (
@@ -57,10 +116,11 @@ export default function LoginView({ onLogin }) {
               </div>
 
               <div>
-                <label className="text-xs font-semibold uppercase tracking-wider" style={{color:'var(--ink-mute)'}}>Usuario</label>
+                <label className="text-xs font-semibold uppercase tracking-wider" style={{color:'var(--ink-mute)'}}>Correo</label>
                 <div className="mt-1.5 relative">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--ink-mute)]"><I.user size={18}/></div>
-                  <input value={user} onChange={e=>setUser(e.target.value)}
+                  <input type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)}
+                    placeholder="tu@correo.cl"
                     className="w-full h-12 pl-10 pr-3 rounded-xl bg-[color:var(--paper-2)] border border-black/5 text-[15px] ring-brand"/>
                 </div>
               </div>
@@ -69,7 +129,7 @@ export default function LoginView({ onLogin }) {
                 <label className="text-xs font-semibold uppercase tracking-wider" style={{color:'var(--ink-mute)'}}>Contraseña</label>
                 <div className="mt-1.5 relative">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--ink-mute)]"><I.lock size={18}/></div>
-                  <input type={showPass?'text':'password'} value={pass} onChange={e=>setPass(e.target.value)}
+                  <input type={showPass?'text':'password'} autoComplete="current-password" required value={pass} onChange={e=>setPass(e.target.value)}
                     className="w-full h-12 pl-10 pr-10 rounded-xl bg-[color:var(--paper-2)] border border-black/5 text-[15px] ring-brand"/>
                   <button type="button" onClick={()=>setShowPass(s=>!s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[color:var(--ink-mute)]">
                     {showPass ? <I.eyeOff size={18}/> : <I.eye size={18}/>}
@@ -77,20 +137,11 @@ export default function LoginView({ onLogin }) {
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider" style={{color:'var(--ink-mute)'}}>Rol</label>
-                <div className="mt-1.5 grid grid-cols-2 gap-2">
-                  {['admin','cajero'].map(r => (
-                    <button key={r} type="button" onClick={()=>setRole(r)}
-                      className={`press h-11 rounded-xl font-semibold text-sm capitalize border transition-all`}
-                      style={role===r
-                        ? { background:'var(--ink)', color:'white', borderColor:'var(--ink)'}
-                        : { background:'white', color:'var(--ink-soft)', borderColor:'rgba(0,0,0,0.08)'}}>
-                      {r === 'admin' ? 'Administrador' : 'Cajero'}
-                    </button>
-                  ))}
+              {error && (
+                <div className="text-sm rounded-xl px-3 py-2 border" style={{color:'var(--tomato-deep)', borderColor:'rgba(220,60,40,0.25)', background:'rgba(220,60,40,0.06)'}}>
+                  {error}
                 </div>
-              </div>
+              )}
 
               <Button type="submit" size="lg" className="w-full mt-2" disabled={loading}>
                 {loading ? 'Entrando…' : <>Entrar <I.chevR size={18}/></>}
@@ -107,7 +158,12 @@ export default function LoginView({ onLogin }) {
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider" style={{color:'var(--tomato-deep)'}}>Paso 2 de 2</div>
                 <div className="font-display font-bold text-xl mt-1">Apertura de caja</div>
-                <div className="text-sm" style={{color:'var(--ink-mute)'}}>Monto de efectivo con que inicias el turno.</div>
+                <div className="text-sm" style={{color:'var(--ink-mute)'}}>
+                  Hola <b className="capitalize">{profile?.first_name}</b> ({profile?.role}). Monto de efectivo con que inicias el turno.
+                </div>
+                <div className="text-[11px] mt-1" style={{color:'var(--pickle-deep, var(--ink-mute))'}}>
+                  💡 Sugerido según el cierre anterior.
+                </div>
               </div>
               <div className="rounded-2xl p-5 text-center" style={{background:'var(--cream)'}}>
                 <div className="text-xs font-semibold uppercase tracking-wider" style={{color:'var(--ink-mute)'}}>Monto apertura (CLP)</div>

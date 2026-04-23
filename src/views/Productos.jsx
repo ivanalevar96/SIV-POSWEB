@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { I } from '../icons.jsx';
 import { FoodPlaceholder, Card, Button, Modal, Chip } from '../ui.jsx';
-import { PRODUCTS, CATEGORIES, fmtCLP } from '../data.js';
+import { fmtCLP } from '../data.js';
+import { useProducts, useCategories } from '../hooks/useCatalog.js';
 
 export default function Productos({ state }) {
   const [openForm, setOpenForm] = useState(false);
   const [search, setSearch] = useState('');
   const [cat, setCat] = useState('all');
   const isMobile = state.viewport === 'mobile';
-  const filtered = PRODUCTS.filter(p =>
+  const { products, loading } = useProducts();
+  const { categories } = useCategories();
+  const filtered = products.filter(p =>
     (cat==='all' || p.cat===cat) && p.name.toLowerCase().includes(search.toLowerCase())
   );
   return (
@@ -16,7 +19,7 @@ export default function Productos({ state }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <div className="font-display font-bold text-2xl md:text-3xl">Productos</div>
-          <div className="text-xs" style={{color:'var(--ink-mute)'}}>{PRODUCTS.length} productos · {CATEGORIES.length} categorías</div>
+          <div className="text-xs" style={{color:'var(--ink-mute)'}}>{loading ? 'Cargando…' : `${products.length} productos · ${categories.length} categorías`}</div>
         </div>
         <Button variant="dark" onClick={()=>setOpenForm(true)}><I.plus size={16}/> {isMobile?'':'Agregar producto'}</Button>
       </div>
@@ -30,7 +33,7 @@ export default function Productos({ state }) {
           </div>
           <div className="flex gap-2 overflow-x-auto no-scrollbar">
             <Chip active={cat==='all'} onClick={()=>setCat('all')} color="ink">Todas</Chip>
-            {CATEGORIES.map(c => <Chip key={c.id} active={cat===c.id} onClick={()=>setCat(c.id)} color={c.color}>{c.name}</Chip>)}
+            {categories.map(c => <Chip key={c.id} active={cat===c.id} onClick={()=>setCat(c.id)} color={c.color}>{c.name}</Chip>)}
           </div>
         </div>
       </Card>
@@ -41,7 +44,7 @@ export default function Productos({ state }) {
             <div></div><div>Producto</div><div>Categoría</div><div>Precio</div><div>Stock</div><div>Estado</div><div></div>
           </div>
           {filtered.map(p => {
-            const c = CATEGORIES.find(x=>x.id===p.cat);
+            const c = categories.find(x=>x.id===p.cat) || { color:'mustard', name:'—' };
             const low = p.stock < 30;
             return (
               <div key={p.id} className="grid grid-cols-[80px_2fr_1fr_1fr_110px_110px_40px] px-4 py-3 border-b border-black/5 items-center hover:bg-black/[0.02]">
@@ -73,7 +76,7 @@ export default function Productos({ state }) {
       ) : (
         <div className="space-y-2">
           {filtered.map(p => {
-            const c = CATEGORIES.find(x=>x.id===p.cat);
+            const c = categories.find(x=>x.id===p.cat) || { color:'mustard', name:'—' };
             const low = p.stock < 30;
             return (
               <Card key={p.id} className="p-3 flex items-center gap-3">
@@ -95,12 +98,12 @@ export default function Productos({ state }) {
         </div>
       )}
 
-      {openForm && <ProductForm onClose={()=>setOpenForm(false)} fullscreen={isMobile}/>}
+      {openForm && <ProductForm onClose={()=>setOpenForm(false)} fullscreen={isMobile} categories={categories}/>}
     </div>
   );
 }
 
-function ProductForm({ onClose, fullscreen }) {
+function ProductForm({ onClose, fullscreen, categories = [] }) {
   const [hasSizes, setHasSizes] = useState(false);
   const [sizes, setSizes] = useState([{ name: 'Mediana', price: '' }]);
   return (
@@ -123,7 +126,7 @@ function ProductForm({ onClose, fullscreen }) {
           <div className="grid grid-cols-2 gap-3">
             <Field label="Categoría">
               <select className="w-full h-11 px-3 rounded-xl bg-[color:var(--paper-2)] border border-black/5">
-                {CATEGORIES.map(c => <option key={c.id}>{c.name}</option>)}
+                {categories.map(c => <option key={c.id}>{c.name}</option>)}
               </select>
             </Field>
             <Field label="Stock inicial">

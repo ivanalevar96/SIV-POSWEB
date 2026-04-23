@@ -37,22 +37,34 @@ export default function Shell({ state, dispatch, children, onGo }) {
           </nav>
           <div className={`p-3 border-t border-white/10 ${isTablet?'flex justify-center':''}`}>
             {isTablet ? (
-              <button onClick={()=>dispatch({type:'LOGOUT'})} className="press w-11 h-11 rounded-xl flex items-center justify-center hover:bg-white/5" style={{color:'rgba(255,255,255,0.7)'}}>
-                <I.logout size={20}/>
-              </button>
-            ) : (
-              <div className="rounded-xl p-3 bg-white/5 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center font-display font-bold" style={{background:'var(--mustard)', color:'black'}}>
-                  {state.user.first[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold truncate">{state.user.first}</div>
-                  <div className="text-[11px] text-white/50 capitalize">{state.user.role}</div>
-                </div>
-                <button onClick={()=>dispatch({type:'LOGOUT'})} className="press w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center" style={{color:'rgba(255,255,255,0.7)'}}>
-                  <I.logout size={16}/>
+              <div className="flex flex-col gap-2">
+                <button onClick={()=>dispatch({type:'OPEN_CLOSE_CASH'})} title="Cerrar caja" className="press w-11 h-11 rounded-xl flex items-center justify-center hover:bg-white/5" style={{color:'var(--tomato)'}}>
+                  <I.cash size={20}/>
+                </button>
+                <button onClick={()=>dispatch({type:'LOGOUT'})} title="Cerrar sesión" className="press w-11 h-11 rounded-xl flex items-center justify-center hover:bg-white/5" style={{color:'rgba(255,255,255,0.7)'}}>
+                  <I.logout size={20}/>
                 </button>
               </div>
+            ) : (
+              <>
+                <button onClick={()=>dispatch({type:'OPEN_CLOSE_CASH'})}
+                  className="press w-full h-10 mb-2 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold"
+                  style={{background:'rgba(220,60,40,0.12)', color:'var(--tomato)'}}>
+                  <I.cash size={16}/> Cerrar caja
+                </button>
+                <div className="rounded-xl p-3 bg-white/5 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-display font-bold" style={{background:'var(--mustard)', color:'black'}}>
+                    {state.user.first[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold truncate">{state.user.first}</div>
+                    <div className="text-[11px] text-white/50 capitalize">{state.user.role}</div>
+                  </div>
+                  <button onClick={()=>dispatch({type:'LOGOUT'})} title="Cerrar sesión" className="press w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center" style={{color:'rgba(255,255,255,0.7)'}}>
+                    <I.logout size={16}/>
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </aside>
@@ -131,7 +143,12 @@ export default function Shell({ state, dispatch, children, onGo }) {
                   );
                 })}
               </div>
-              <div className="absolute bottom-0 left-0 right-0 p-5 border-t border-white/10">
+              <div className="absolute bottom-0 left-0 right-0 p-5 border-t border-white/10 space-y-3">
+                <button onClick={()=>{ dispatch({type:'OPEN_CLOSE_CASH'}); setMenuOpen(false); }}
+                  className="press w-full h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold"
+                  style={{background:'rgba(220,60,40,0.15)', color:'var(--tomato)'}}>
+                  <I.cash size={16}/> Cerrar caja
+                </button>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full flex items-center justify-center font-display font-bold" style={{background:'var(--mustard)', color:'black'}}>
                     {state.user.first[0]}

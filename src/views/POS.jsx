@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { I } from '../icons.jsx';
 import { FoodPlaceholder, Logo, Button, Modal, Chip, Toast } from '../ui.jsx';
-import { PRODUCTS, CATEGORIES, fmtCLP, nowHM } from '../data.js';
+import { fmtCLP, nowHM } from '../data.js';
+import { useProducts, useCategories } from '../hooks/useCatalog.js';
+import { createSale } from '../hooks/useSales.js';
 
 export default function POSView({ state, dispatch, onReceipt }) {
   const [cat, setCat] = useState('all');
@@ -12,7 +14,10 @@ export default function POSView({ state, dispatch, onReceipt }) {
   const [toast, setToast] = useState(null);
   const isMobile = state.viewport === 'mobile';
 
-  const filtered = PRODUCTS.filter(p =>
+  const { products, loading: loadingProducts } = useProducts();
+  const { categories } = useCategories();
+
+  const filtered = products.filter(p =>
     (cat === 'all' || p.cat === cat) &&
     (p.name.toLowerCase().includes(query.toLowerCase()))
   );
@@ -20,7 +25,7 @@ export default function POSView({ state, dispatch, onReceipt }) {
   const addItem = (p, size) => {
     const key = size ? `${p.id}-${size.name}` : p.id;
     const price = size ? size.price : p.price;
-    dispatch({ type: 'ADD', key, item: { key, id: p.id, name: p.name + (size ? ` ${size.name}` : ''), price } });
+    dispatch({ type: 'ADD', key, item: { key, id: p.id, baseName: p.name, name: p.name + (size ? ` ${size.name}` : ''), price, size_name: size?.name || null } });
     setBumpId(key);
     setTimeout(()=>setBumpId(null), 320);
     setToast('Agregado al carrito');
@@ -43,7 +48,7 @@ export default function POSView({ state, dispatch, onReceipt }) {
           <div className="flex items-center gap-3">
             <div className="flex-1">
               <div className="font-display font-bold text-2xl md:text-3xl">Nueva venta</div>
-              <div className="text-xs" style={{color:'var(--ink-mute)'}}>{filtered.length} productos disponibles</div>
+              <div className="text-xs" style={{color:'var(--ink-mute)'}}>{loadingProducts ? 'Cargando catálogo…' : `${filtered.length} productos disponibles`}</div>
             </div>
             <div className="relative flex-1 max-w-xs hidden sm:block">
               <I.search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--ink-mute)]"/>
@@ -54,7 +59,7 @@ export default function POSView({ state, dispatch, onReceipt }) {
 
           <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
             <Chip active={cat==='all'} onClick={()=>setCat('all')} color="ink">Todos</Chip>
-            {CATEGORIES.map(c => (
+            {categories.map(c => (
               <Chip key={c.id} active={cat===c.id} onClick={()=>setCat(c.id)} color={c.color}>
                 <span className="mr-1">{c.emoji}</span>{c.name}
               </Chip>
@@ -65,7 +70,7 @@ export default function POSView({ state, dispatch, onReceipt }) {
         <div className="flex-1 overflow-y-auto px-4 md:px-6 pb-32 md:pb-6">
           <div className={`grid ${gridCols} gap-3`}>
             {filtered.map(p => (
-              <ProductCard key={p.id} p={p} onPick={onPick} bumping={bumpId && bumpId.startsWith(p.id)}/>
+              <ProductCard key={p.id} p={p} onPick={onPick} bumping={bumpId && bumpId.startsWith(p.id)} categories={categories}/>
             ))}
           </div>
         </div>
@@ -73,7 +78,7 @@ export default function POSView({ state, dispatch, onReceipt }) {
 
       {!isMobile && (
         <aside className="w-[340px] shrink-0 border-l border-black/5 bg-white flex flex-col">
-          <CartPanel state={state} dispatch={dispatch} onCheckout={onReceipt} bumpId={bumpId}/>
+          <CartPanel state={state} dispatch={dispatch} onCheckout={onReceipt} bumpId={bumpId} setToast={setToast}/>
         </aside>
       )}
 
@@ -97,7 +102,7 @@ export default function POSView({ state, dispatch, onReceipt }) {
             <div className="font-display font-bold text-lg">Carrito ({cartCount})</div>
             <button onClick={()=>setCartOpen(false)} className="w-9 h-9 rounded-full bg-black/5 flex items-center justify-center press"><I.x size={18}/></button>
           </div>
-          <CartPanel state={state} dispatch={dispatch} onCheckout={(sale)=>{ setCartOpen(false); onReceipt(sale); }} bumpId={bumpId}/>
+          <CartPanel state={state} dispatch={dispatch} onCheckout={(sale)=>{ setCartOpen(false); onReceipt(sale); }} bumpId={bumpId} setToast={setToast}/>
         </div>
       )}
 
@@ -105,7 +110,7 @@ export default function POSView({ state, dispatch, onReceipt }) {
         <Modal open onClose={()=>setSizeModal(null)} position={isMobile?'bottom':'center'}
           className={isMobile?'w-full rounded-t-3xl bg-white p-5':'w-[420px] rounded-3xl bg-white p-6'}>
           <div className="flex items-start gap-4">
-            <FoodPlaceholder label={sizeModal.name} img={sizeModal.img} color={CATEGORIES.find(c=>c.id===sizeModal.cat)?.color} className="w-20 h-20 rounded-2xl"/>
+            <FoodPlaceholder label={sizeModal.name} img={sizeModal.img} color={categories.find(c=>c.id===sizeModal.cat)?.color} className="w-20 h-20 rounded-2xl"/>
             <div className="flex-1">
               <div className="font-display font-bold text-lg leading-tight">{sizeModal.name}</div>
               <div className="text-xs" style={{color:'var(--ink-mute)'}}>{sizeModal.desc}</div>
@@ -138,8 +143,8 @@ export default function POSView({ state, dispatch, onReceipt }) {
   );
 }
 
-function ProductCard({ p, onPick, bumping }) {
-  const cat = CATEGORIES.find(c => c.id === p.cat);
+function ProductCard({ p, onPick, bumping, categories }) {
+  const cat = categories.find(c => c.id === p.cat);
   const minPrice = p.sizes ? Math.min(...p.sizes.map(s=>s.price)) : p.price;
   const lowStock = p.stock < 30;
   return (
@@ -173,24 +178,42 @@ function ProductCard({ p, onPick, bumping }) {
   );
 }
 
-function CartPanel({ state, dispatch, onCheckout, bumpId }) {
+function CartPanel({ state, dispatch, onCheckout, bumpId, setToast }) {
   const [method, setMethod] = useState('efectivo');
   const [recibido, setRecibido] = useState('');
+  const [saving, setSaving] = useState(false);
   const total = state.cart.reduce((a,i)=>a+i.qty*i.price, 0);
   const recibidoNum = parseInt(recibido.replace(/\D/g,'')||'0',10);
   const vuelto = Math.max(0, recibidoNum - total);
   const enough = method==='tarjeta' || recibidoNum >= total;
   const empty = state.cart.length === 0;
 
-  const finalize = () => {
-    if (empty || !enough) return;
-    onCheckout({
-      id: `V-${String(248 + state.salesToday).padStart(4,'0')}`,
-      items: [...state.cart],
-      total, method, recibido: recibidoNum, vuelto,
-      cashier: state.user.first,
-      time: nowHM(),
-    });
+  const finalize = async () => {
+    if (empty || !enough || saving) return;
+    setSaving(true);
+    try {
+      const sale = await createSale({
+        items: state.cart,
+        method,
+        total,
+        recibido: method==='efectivo' ? recibidoNum : null,
+        vuelto: method==='efectivo' ? vuelto : null,
+        cashier_name: state.user.first,
+      });
+      onCheckout({
+        id: sale.code,
+        items: [...state.cart],
+        total, method, recibido: recibidoNum, vuelto,
+        cashier: state.user.first,
+        time: nowHM(),
+      });
+      setRecibido('');
+    } catch (err) {
+      console.error(err);
+      setToast?.('Error: ' + (err.message || 'no se pudo guardar'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -276,8 +299,8 @@ function CartPanel({ state, dispatch, onCheckout, bumpId }) {
             </div>
           )}
 
-          <Button size="lg" variant={enough?'dark':'outline'} disabled={!enough} onClick={finalize} className="w-full">
-            <I.check size={18}/> Finalizar venta · {fmtCLP(total)}
+          <Button size="lg" variant={enough?'dark':'outline'} disabled={!enough || saving} onClick={finalize} className="w-full">
+            <I.check size={18}/> {saving ? 'Guardando…' : `Finalizar venta · ${fmtCLP(total)}`}
           </Button>
         </div>
       )}

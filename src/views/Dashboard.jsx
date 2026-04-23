@@ -1,11 +1,68 @@
+import { useMemo } from 'react';
 import { I } from '../icons.jsx';
 import { Card, Button, Segmented, BarChart, Donut } from '../ui.jsx';
-import { HOURS, todaySalesByHour, RECENT_SALES, fmtCLP } from '../data.js';
+import { fmtCLP } from '../data.js';
+import { useSales } from '../hooks/useSales.js';
+
+const HOURS = ['11','12','13','14','15','16','17','18','19','20','21','22'];
+
+function isSameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() &&
+         a.getMonth() === b.getMonth() &&
+         a.getDate() === b.getDate();
+}
 
 export default function Dashboard({ state, onGo }) {
-  const { openingAmount, sales, cashSales, cardSales } = state.summary;
-  const total = cashSales + cardSales + openingAmount;
-  const chartData = HOURS.map((h,i) => ({ l: h, v: todaySalesByHour[i] }));
+  const { openingAmount } = state.summary;
+  const { sales: allSales, loading } = useSales({ limit: 500 });
+
+  const metrics = useMemo(() => {
+    const today = new Date();
+    const todaySales = allSales.filter(s => s.date && isSameDay(s.date, today));
+
+    const cashSales = todaySales
+      .filter(s => s.method === 'efectivo')
+      .reduce((a, s) => a + (s.total || 0), 0);
+    const cardSales = todaySales
+      .filter(s => s.method === 'tarjeta')
+      .reduce((a, s) => a + (s.total || 0), 0);
+
+    // Ventas por hora (transacciones, no monto)
+    const byHour = HOURS.map(h => ({ l: h, v: 0 }));
+    todaySales.forEach(s => {
+      const hh = String(s.date.getHours()).padStart(2, '0');
+      const idx = HOURS.indexOf(hh);
+      if (idx >= 0) byHour[idx].v += 1;
+    });
+
+    // Hora peak
+    const peak = byHour.reduce((a, b) => (b.v > a.v ? b : a), { l: '—', v: 0 });
+
+    // Ticket promedio
+    const totalRevenue = cashSales + cardSales;
+    const avgTicket = todaySales.length > 0 ? totalRevenue / todaySales.length : 0;
+
+    // Flujo por hora (promedio en horas con actividad)
+    const activeHours = byHour.filter(h => h.v > 0).length;
+    const flowPerHour = activeHours > 0 ? todaySales.length / activeHours : 0;
+
+    return {
+      todayCount: todaySales.length,
+      cashSales,
+      cardSales,
+      byHour,
+      peak,
+      avgTicket,
+      flowPerHour,
+      recent: allSales.slice(0, 6),
+    };
+  }, [allSales]);
+
+  const total = metrics.cashSales + metrics.cardSales + openingAmount;
+  const payTotal = metrics.cashSales + metrics.cardSales;
+  const cashPct = payTotal > 0 ? Math.round(metrics.cashSales / payTotal * 100) : 0;
+  const cardPct = payTotal > 0 ? 100 - cashPct : 0;
+
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-5 pb-28 md:pb-6">
       <div className="flex items-center justify-between">
@@ -33,8 +90,8 @@ export default function Dashboard({ state, onGo }) {
 
             <div className="mt-5 grid grid-cols-3 gap-3">
               <Stat label="Apertura" value={fmtCLP(openingAmount)} dark/>
-              <Stat label="Efectivo" value={fmtCLP(cashSales)} dark accent="mustard"/>
-              <Stat label="Tarjeta" value={fmtCLP(cardSales)} dark accent="tomato"/>
+              <Stat label="Efectivo" value={fmtCLP(metrics.cashSales)} dark accent="mustard"/>
+              <Stat label="Tarjeta" value={fmtCLP(metrics.cardSales)} dark accent="tomato"/>
             </div>
           </div>
         </Card>
@@ -43,22 +100,24 @@ export default function Dashboard({ state, onGo }) {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.15em]" style={{color:'var(--ink-mute)'}}>Ventas hoy</div>
-              <div className="font-display font-bold text-4xl tabnum mt-1">{sales}</div>
-              <div className="text-xs mt-1" style={{color:'var(--pickle)'}}>↑ 18% vs ayer</div>
+              <div className="font-display font-bold text-4xl tabnum mt-1">{metrics.todayCount}</div>
+              <div className="text-xs mt-1" style={{color:'var(--ink-mute)'}}>
+                {loading ? 'Cargando…' : (metrics.todayCount === 0 ? 'Sin ventas aún' : `${fmtCLP(payTotal)} vendidos`)}
+              </div>
             </div>
             <Donut
               size={110} thick={16}
-              segments={[
-                { value: cashSales, color: 'oklch(0.82 0.17 85)' },
-                { value: cardSales, color: 'oklch(0.63 0.22 25)' },
-              ]}
-              label={fmtCLP(cashSales + cardSales)}
+              segments={payTotal > 0 ? [
+                { value: metrics.cashSales, color: 'oklch(0.82 0.17 85)' },
+                { value: metrics.cardSales, color: 'oklch(0.63 0.22 25)' },
+              ] : [{ value: 1, color: 'oklch(0.92 0 0)' }]}
+              label={fmtCLP(payTotal)}
               sub="ventas"
             />
           </div>
           <div className="mt-3 pt-3 border-t border-black/5 flex items-center justify-between text-xs">
-            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{background:'var(--mustard)'}}/>Efectivo {Math.round(cashSales/(cashSales+cardSales)*100)}%</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{background:'var(--tomato)'}}/>Tarjeta {Math.round(cardSales/(cashSales+cardSales)*100)}%</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{background:'var(--mustard)'}}/>Efectivo {cashPct}%</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{background:'var(--tomato)'}}/>Tarjeta {cardPct}%</span>
           </div>
         </Card>
       </div>
@@ -80,11 +139,11 @@ export default function Dashboard({ state, onGo }) {
               ]}
             />
           </div>
-          <BarChart data={chartData} valueKey="v" labelKey="l" height={180} color="oklch(0.82 0.17 85)"/>
+          <BarChart data={metrics.byHour} valueKey="v" labelKey="l" height={180} color="oklch(0.82 0.17 85)"/>
           <div className="mt-3 pt-3 border-t border-black/5 grid grid-cols-3 gap-4">
-            <MiniStat label="Hora peak" value="20:00" sub="31 ventas"/>
-            <MiniStat label="Ticket prom." value={fmtCLP(4850)} sub="↑ 4%"/>
-            <MiniStat label="Flujo/hora" value="16.2" sub="ventas/h"/>
+            <MiniStat label="Hora peak" value={metrics.peak.v > 0 ? `${metrics.peak.l}:00` : '—'} sub={metrics.peak.v > 0 ? `${metrics.peak.v} ventas` : 'sin datos'}/>
+            <MiniStat label="Ticket prom." value={fmtCLP(metrics.avgTicket)} sub={metrics.todayCount > 0 ? `${metrics.todayCount} ventas` : '—'}/>
+            <MiniStat label="Flujo/hora" value={metrics.flowPerHour.toFixed(1)} sub="ventas/h"/>
           </div>
         </Card>
 
@@ -94,14 +153,17 @@ export default function Dashboard({ state, onGo }) {
             <button onClick={()=>onGo('historial')} className="text-xs font-semibold" style={{color:'var(--tomato-deep)'}}>Ver todas →</button>
           </div>
           <div className="space-y-2 overflow-y-auto max-h-[280px] pr-1">
-            {RECENT_SALES.slice(0,6).map(s => (
+            {metrics.recent.length === 0 && !loading && (
+              <div className="text-sm text-center py-8" style={{color:'var(--ink-mute)'}}>Sin ventas registradas</div>
+            )}
+            {metrics.recent.map(s => (
               <div key={s.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-black/[0.03] transition-colors">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{background: s.method==='efectivo' ? 'oklch(0.95 0.07 85)' : 'oklch(0.94 0.08 25)'}}>
                   {s.method==='efectivo' ? <I.cash size={16}/> : <I.card size={16}/>}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold truncate">{s.items.map(i=>i.n).join(' · ')}</div>
-                  <div className="text-[11px]" style={{color:'var(--ink-mute)'}}>{s.id} · {s.time} · {s.cashier}</div>
+                  <div className="text-sm font-semibold truncate">{s.items.map(i=>`${i.qty}× ${i.n}`).join(' · ') || '—'}</div>
+                  <div className="text-[11px]" style={{color:'var(--ink-mute)'}}>{s.id} · {s.time}{s.cashier?` · ${s.cashier}`:''}</div>
                 </div>
                 <div className="text-sm font-bold tabnum">{fmtCLP(s.total)}</div>
               </div>

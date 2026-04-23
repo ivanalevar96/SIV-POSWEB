@@ -1,21 +1,35 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { I } from '../icons.jsx';
 import { Card, Button, Modal, Chip } from '../ui.jsx';
-import { RECENT_SALES, fmtCLP } from '../data.js';
+import { fmtCLP } from '../data.js';
+import { useSales } from '../hooks/useSales.js';
 
 export default function Historial({ state }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [method, setMethod] = useState('all');
+  const [cashier, setCashier] = useState('all');
   const [detail, setDetail] = useState(null);
   const isMobile = state.viewport === 'mobile';
-  const sales = RECENT_SALES.filter(s => method==='all' || s.method===method);
+  const { sales: allSales, loading } = useSales({ limit: 100 });
+
+  // Lista única de cajeros a partir de las ventas cargadas
+  const cashiers = useMemo(() => {
+    const set = new Set();
+    allSales.forEach(s => { if (s.cashier) set.add(s.cashier); });
+    return Array.from(set).sort();
+  }, [allSales]);
+
+  const sales = allSales.filter(s =>
+    (method === 'all' || s.method === method) &&
+    (cashier === 'all' || s.cashier === cashier)
+  );
 
   return (
     <div className="p-4 md:p-6 pb-28 md:pb-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <div className="font-display font-bold text-2xl md:text-3xl">Historial</div>
-          <div className="text-xs" style={{color:'var(--ink-mute)'}}>{sales.length} ventas · hoy</div>
+          <div className="text-xs" style={{color:'var(--ink-mute)'}}>{loading ? 'Cargando…' : `${sales.length} ventas`}</div>
         </div>
         <Button variant="outline" size="sm"><I.download size={16}/> CSV</Button>
       </div>
@@ -26,10 +40,10 @@ export default function Historial({ state }) {
             <div className="inline-flex items-center gap-2 font-semibold text-sm"><I.filter size={16}/> Filtros</div>
             <I.chevD size={16} style={{transform: filtersOpen?'rotate(180deg)':''}}/>
           </button>
-          {filtersOpen && <FiltersBody method={method} setMethod={setMethod}/>}
+          {filtersOpen && <FiltersBody method={method} setMethod={setMethod} cashier={cashier} setCashier={setCashier} cashiers={cashiers}/>}
         </Card>
       ) : (
-        <Card className="p-4 mb-4"><FiltersBody method={method} setMethod={setMethod}/></Card>
+        <Card className="p-4 mb-4"><FiltersBody method={method} setMethod={setMethod} cashier={cashier} setCashier={setCashier} cashiers={cashiers}/></Card>
       )}
 
       {!isMobile ? (
@@ -93,8 +107,8 @@ export default function Historial({ state }) {
           <div className="mt-4 space-y-2">
             {detail.items.map((it,i) => (
               <div key={i} className="flex justify-between text-sm">
-                <span>{it.n}</span>
-                <span className="tabnum font-semibold">—</span>
+                <span>{it.qty}× {it.n}</span>
+                <span className="tabnum font-semibold">{fmtCLP(it.qty * it.price)}</span>
               </div>
             ))}
           </div>
@@ -111,19 +125,12 @@ export default function Historial({ state }) {
   );
 }
 
-function FiltersBody({ method, setMethod }) {
+function FiltersBody({ method, setMethod, cashier, setCashier, cashiers }) {
   return (
     <div className="px-4 py-3 space-y-3">
       <div>
-        <div className="text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{color:'var(--ink-mute)'}}>Rango de fechas</div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="h-10 px-3 rounded-lg bg-[color:var(--paper-2)] border border-black/5 flex items-center gap-2 text-sm"><I.calendar size={14}/> 21 Abr</div>
-          <div className="h-10 px-3 rounded-lg bg-[color:var(--paper-2)] border border-black/5 flex items-center gap-2 text-sm"><I.calendar size={14}/> 22 Abr</div>
-        </div>
-      </div>
-      <div>
         <div className="text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{color:'var(--ink-mute)'}}>Método de pago</div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Chip active={method==='all'} onClick={()=>setMethod('all')} color="ink">Todos</Chip>
           <Chip active={method==='efectivo'} onClick={()=>setMethod('efectivo')} color="mustard">Efectivo</Chip>
           <Chip active={method==='tarjeta'} onClick={()=>setMethod('tarjeta')} color="tomato">Tarjeta</Chip>
@@ -131,10 +138,14 @@ function FiltersBody({ method, setMethod }) {
       </div>
       <div>
         <div className="text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{color:'var(--ink-mute)'}}>Cajero</div>
-        <div className="flex gap-2">
-          <Chip active onClick={()=>{}} color="ink">Todos</Chip>
-          <Chip onClick={()=>{}} color="ink">Cata</Chip>
-          <Chip onClick={()=>{}} color="ink">Felipe</Chip>
+        <div className="flex gap-2 flex-wrap">
+          <Chip active={cashier==='all'} onClick={()=>setCashier('all')} color="ink">Todos</Chip>
+          {cashiers.length === 0 && (
+            <span className="text-xs self-center" style={{color:'var(--ink-mute)'}}>Sin ventas registradas</span>
+          )}
+          {cashiers.map(name => (
+            <Chip key={name} active={cashier===name} onClick={()=>setCashier(name)} color="ink">{name}</Chip>
+          ))}
         </div>
       </div>
     </div>
