@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { I } from '../icons.jsx';
 import { FoodPlaceholder, Logo, Button, Modal, Chip, Toast } from '../ui.jsx';
-import { fmtCLP, nowHM } from '../data.js';
+import { fmtCLP, nowHM, PAYMENT_METHODS, isCashMethod, methodLabel } from '../data.js';
 import { useProducts, useCategories } from '../hooks/useCatalog.js';
 import { createSale } from '../hooks/useSales.js';
 
@@ -185,7 +185,8 @@ function CartPanel({ state, dispatch, onCheckout, bumpId, setToast }) {
   const total = state.cart.reduce((a,i)=>a+i.qty*i.price, 0);
   const recibidoNum = parseInt(recibido.replace(/\D/g,'')||'0',10);
   const vuelto = Math.max(0, recibidoNum - total);
-  const enough = method==='tarjeta' || recibidoNum >= total;
+  const isCash = isCashMethod(method);
+  const enough = !isCash || recibidoNum >= total;
   const empty = state.cart.length === 0;
 
   const finalize = async () => {
@@ -196,8 +197,8 @@ function CartPanel({ state, dispatch, onCheckout, bumpId, setToast }) {
         items: state.cart,
         method,
         total,
-        recibido: method==='efectivo' ? recibidoNum : null,
-        vuelto: method==='efectivo' ? vuelto : null,
+        recibido: isCash ? recibidoNum : null,
+        vuelto: isCash ? vuelto : null,
         cashier_name: state.user.first,
       });
       onCheckout({
@@ -266,17 +267,28 @@ function CartPanel({ state, dispatch, onCheckout, bumpId, setToast }) {
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={()=>setMethod('efectivo')} className={`press h-12 rounded-xl flex items-center justify-center gap-2 font-semibold border-2 transition-all ${method==='efectivo'?'':'bg-white text-[color:var(--ink-mute)]'}`}
-              style={method==='efectivo' ? {background:'var(--mustard)', borderColor:'var(--mustard)', color:'black'} : {borderColor:'rgba(0,0,0,0.08)'}}>
-              <I.cash size={18}/> Efectivo
-            </button>
-            <button onClick={()=>setMethod('tarjeta')} className={`press h-12 rounded-xl flex items-center justify-center gap-2 font-semibold border-2 transition-all ${method==='tarjeta'?'text-white':'bg-white text-[color:var(--ink-mute)]'}`}
-              style={method==='tarjeta' ? {background:'var(--tomato)', borderColor:'var(--tomato)'} : {borderColor:'rgba(0,0,0,0.08)'}}>
-              <I.card size={18}/> Tarjeta
-            </button>
+            {PAYMENT_METHODS.map(m => {
+              const active = method === m.id;
+              const icon = m.id === 'efectivo' ? <I.cash size={16}/>
+                : m.id === 'transferencia' ? <I.wallet size={16}/>
+                : <I.card size={16}/>;
+              const activeStyle = {
+                efectivo:      { background:'var(--mustard)', borderColor:'var(--mustard)', color:'black' },
+                debito:        { background:'var(--tomato)',  borderColor:'var(--tomato)',  color:'white' },
+                credito:       { background:'var(--pickle)',  borderColor:'var(--pickle)',  color:'white' },
+                transferencia: { background:'var(--ink)',     borderColor:'var(--ink)',     color:'white' },
+              }[m.id];
+              return (
+                <button key={m.id} onClick={()=>setMethod(m.id)}
+                  className={`press h-12 rounded-xl flex items-center justify-center gap-2 font-semibold border-2 transition-all text-sm ${active?'':'bg-white text-[color:var(--ink-mute)]'}`}
+                  style={active ? activeStyle : {borderColor:'rgba(0,0,0,0.08)'}}>
+                  {icon} {m.label}
+                </button>
+              );
+            })}
           </div>
 
-          {method === 'efectivo' && (
+          {isCash && (
             <div className="rounded-xl p-3 space-y-2" style={{background:'var(--paper-2)'}}>
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider" style={{color:'var(--ink-mute)'}}>Monto recibido</label>
@@ -327,7 +339,7 @@ export function Receipt({ sale, onClose }) {
           ))}
         </div>
         <div className="px-5 py-3 border-t border-dashed border-black/15 space-y-1 text-sm">
-          <div className="flex justify-between"><span style={{color:'var(--ink-mute)'}}>Método</span><span className="font-semibold capitalize">{sale.method}</span></div>
+          <div className="flex justify-between"><span style={{color:'var(--ink-mute)'}}>Método</span><span className="font-semibold">{methodLabel(sale.method)}</span></div>
           {sale.method==='efectivo' && (
             <>
               <div className="flex justify-between"><span style={{color:'var(--ink-mute)'}}>Recibido</span><span className="tabnum">{fmtCLP(sale.recibido)}</span></div>

@@ -7,7 +7,8 @@
 -- -----------------------------------------------------------
 -- 0. Limpieza (opcional — comentar si ya tienes data real)
 -- -----------------------------------------------------------
-drop table if exists sale_items  cascade;
+drop table if exists cash_movements cascade;
+drop table if exists sale_items   cascade;
 drop table if exists sales        cascade;
 drop table if exists cash_sessions cascade;
 drop table if exists products     cascade;
@@ -67,7 +68,7 @@ create table sales (
   session_id    uuid references cash_sessions(id),
   cashier_id    uuid references auth.users(id),
   cashier_name  text,                                 -- snapshot por si cambia el user
-  method        text check (method in ('efectivo','tarjeta')) not null,
+  method        text check (method in ('efectivo','debito','credito','transferencia','tarjeta')) not null,
   total         integer not null,
   received      integer,
   change_given  integer,
@@ -85,10 +86,24 @@ create table sale_items (
   unit_price     integer not null
 );
 
+-- Movimientos intradía de caja (retiros / ingresos externos)
+create table cash_movements (
+  id           uuid primary key default gen_random_uuid(),
+  session_id   uuid references cash_sessions(id) on delete cascade,
+  type         text check (type in ('retiro','ingreso')) not null,
+  amount       integer not null check (amount > 0),
+  reason       text,
+  created_by   uuid references auth.users(id),
+  cashier_name text,
+  created_at   timestamptz default now()
+);
+
 -- Índices útiles
-create index idx_products_category on products(category_id) where active = true;
-create index idx_sales_created     on sales(created_at desc);
-create index idx_sale_items_sale   on sale_items(sale_id);
+create index idx_products_category   on products(category_id) where active = true;
+create index idx_sales_created       on sales(created_at desc);
+create index idx_sale_items_sale     on sale_items(sale_id);
+create index idx_cash_mov_session    on cash_movements(session_id);
+create index idx_cash_mov_created    on cash_movements(created_at desc);
 
 -- -----------------------------------------------------------
 -- 2. Trigger: auto-crear profile al registrarse
@@ -120,6 +135,7 @@ alter table products       enable row level security;
 alter table cash_sessions  enable row level security;
 alter table sales          enable row level security;
 alter table sale_items     enable row level security;
+alter table cash_movements enable row level security;
 
 -- Helper: ¿es admin?
 create or replace function public.is_admin()
@@ -155,6 +171,12 @@ create policy "sales read"   on sales      for select using (auth.role() = 'auth
 create policy "sales insert" on sales      for insert with check (auth.role() = 'authenticated');
 create policy "items read"   on sale_items for select using (auth.role() = 'authenticated');
 create policy "items insert" on sale_items for insert with check (auth.role() = 'authenticated');
+
+-- cash_movements: autenticados leen e insertan; solo admin puede borrar/editar
+create policy "cash_mov read"   on cash_movements for select using (auth.role() = 'authenticated');
+create policy "cash_mov insert" on cash_movements for insert with check (auth.role() = 'authenticated');
+create policy "cash_mov update" on cash_movements for update using (public.is_admin());
+create policy "cash_mov delete" on cash_movements for delete using (public.is_admin());
 
 -- ============================================================
 -- 4. SEED DATA (categorías + productos con las mismas URLs de Unsplash)

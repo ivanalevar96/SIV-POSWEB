@@ -2,31 +2,41 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
 
 // Devuelve rango [start, end) para el periodo actual y anterior
-function periodRange(now, period) {
-  const end = new Date(now);
-  end.setHours(23, 59, 59, 999);
-
-  let start, prevStart, prevEnd, bucketDays, bucketLabels;
+function periodRange(now, period, customRange) {
+  let start, end, prevStart, prevEnd, bucketDays, bucketLabels;
 
   if (period === 'dia') {
+    end = new Date(now); end.setHours(23, 59, 59, 999);
     start = new Date(now); start.setHours(0, 0, 0, 0);
     prevEnd = new Date(start);
     prevStart = new Date(start); prevStart.setDate(prevStart.getDate() - 1);
-    // Para gráfico diario: comparar por hora (24 buckets)
     bucketDays = null;
   } else if (period === 'semana') {
+    end = new Date(now); end.setHours(23, 59, 59, 999);
     start = new Date(now); start.setHours(0, 0, 0, 0);
-    start.setDate(start.getDate() - 6); // últimos 7 días incluyendo hoy
+    start.setDate(start.getDate() - 6);
     prevEnd = new Date(start);
     prevStart = new Date(start); prevStart.setDate(prevStart.getDate() - 7);
     bucketDays = 7;
     bucketLabels = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
-  } else { // mes
-    start = new Date(now); start.setHours(0, 0, 0, 0);
-    start.setDate(start.getDate() - 29); // últimos 30 días
+  } else if (period === 'mes_calendario') {
+    end = new Date(now); end.setHours(23, 59, 59, 999);
+    start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
     prevEnd = new Date(start);
-    prevStart = new Date(start); prevStart.setDate(prevStart.getDate() - 30);
-    bucketDays = 30;
+    prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+    bucketDays = now.getDate();
+  } else if (period === 'personalizado') {
+    if (!customRange?.from || !customRange?.to) return null;
+    let from = new Date(`${customRange.from}T00:00:00`);
+    let to = new Date(`${customRange.to}T23:59:59.999`);
+    if (to < from) { const t = from; from = new Date(customRange.to + 'T00:00:00'); to = new Date(customRange.from + 'T23:59:59.999'); }
+    start = from; end = to;
+    const lengthMs = end - start;
+    prevEnd = new Date(start);
+    prevStart = new Date(start.getTime() - lengthMs);
+    bucketDays = Math.max(1, Math.ceil(lengthMs / 86400000));
+  } else {
+    return null;
   }
 
   return { start, end, prevStart, prevEnd, bucketDays, bucketLabels };
@@ -37,7 +47,24 @@ function pct(curr, prev) {
   return ((curr - prev) / prev) * 100;
 }
 
-export function useStats(period = 'semana') {
+// Normaliza métodos legacy: 'tarjeta' → 'debito' a efectos de agregación visual.
+// (Ventas antiguas quedan en 'tarjeta'; las nuevas usan débito/crédito/transferencia.)
+const METHOD_KEYS = ['efectivo', 'debito', 'credito', 'transferencia'];
+
+function breakdownByMethod(rows) {
+  const out = Object.fromEntries(METHOD_KEYS.map(k => [k, 0]));
+  out.tarjeta = 0; // legacy bucket
+  rows.forEach(s => {
+    const m = s.method;
+    if (out[m] != null) out[m] += s.total || 0;
+    else out[m] = s.total || 0;
+  });
+  return out;
+}
+
+export function useStats(period = 'semana', customRange = null) {
+  const fromKey = customRange?.from || '';
+  const toKey = customRange?.to || '';
   const [state, setState] = useState({ loading: true, error: null });
 
   useEffect(() => {
@@ -46,13 +73,19 @@ export function useStats(period = 'semana') {
       setState(s => ({ ...s, loading: true }));
       try {
         const now = new Date();
-        const { start, end, prevStart, bucketDays, bucketLabels } = periodRange(now, period);
+        const range = periodRange(now, period, { from: fromKey, to: toKey });
+        if (!range) {
+          setState({ loading: false, error: null, revenue: 0, count: 0, avgTicket: 0, itemsSold: 0,
+            byMethod: {}, prevByMethod: {}, series: [], topProducts: [], byCategory: [] });
+          return;
+        }
+        const { start, end, prevStart, bucketDays, bucketLabels } = range;
 
         // Traer ventas con items + category vía products, desde prevStart hasta end
         const [{ data: sales, error: salesErr }, { data: cats, error: catsErr }] = await Promise.all([
           supabase
             .from('sales')
-            .select('created_at, total, sale_items(name_snapshot, qty, unit_price, products(category_id))')
+            .select('created_at, total, method, sale_items(name_snapshot, qty, unit_price, products(category_id))')
             .gte('created_at', prevStart.toISOString())
             .lte('created_at', end.toISOString())
             .order('created_at', { ascending: true }),
@@ -77,6 +110,10 @@ export function useStats(period = 'semana') {
         const itemsSold = current.reduce((a, s) => a + (s.sale_items || []).reduce((b, it) => b + it.qty, 0), 0);
         const prevItemsSold = previous.reduce((a, s) => a + (s.sale_items || []).reduce((b, it) => b + it.qty, 0), 0);
 
+        // Desglose por método (actual + anterior)
+        const byMethod = breakdownByMethod(current);
+        const prevByMethod = breakdownByMethod(previous);
+
         // Serie temporal para comparativo
         let series;
         if (period === 'dia') {
@@ -88,17 +125,18 @@ export function useStats(period = 'semana') {
           series = curByHour.map((v, h) => ({ d: String(h).padStart(2,'0'), esta: v, pasada: prevByHour[h] }));
         } else {
           // Por día
-          const curByDay = Array(bucketDays).fill(0);
-          const prevByDay = Array(bucketDays).fill(0);
+          const len = Math.max(bucketDays, 1);
+          const curByDay = Array(len).fill(0);
+          const prevByDay = Array(len).fill(0);
           current.forEach(s => {
             const d = new Date(s.created_at);
             const diff = Math.floor((d - start) / (1000 * 60 * 60 * 24));
-            if (diff >= 0 && diff < bucketDays) curByDay[diff] += s.total;
+            if (diff >= 0 && diff < len) curByDay[diff] += s.total;
           });
           previous.forEach(s => {
             const d = new Date(s.created_at);
             const diff = Math.floor((d - prevStart) / (1000 * 60 * 60 * 24));
-            if (diff >= 0 && diff < bucketDays) prevByDay[diff] += s.total;
+            if (diff >= 0 && diff < len) prevByDay[diff] += s.total;
           });
           series = curByDay.map((v, i) => {
             const date = new Date(start); date.setDate(date.getDate() + i);
@@ -134,6 +172,7 @@ export function useStats(period = 'semana') {
           count, prevCount, countDelta: pct(count, prevCount),
           avgTicket, prevAvg, avgDelta: pct(avgTicket, prevAvg),
           itemsSold, prevItemsSold, itemsDelta: pct(itemsSold, prevItemsSold),
+          byMethod, prevByMethod,
           series,
           topProducts,
           byCategory: categoryList,
@@ -143,7 +182,7 @@ export function useStats(period = 'semana') {
       }
     })();
     return () => { cancelled = true; };
-  }, [period]);
+  }, [period, fromKey, toKey]);
 
   return state;
 }

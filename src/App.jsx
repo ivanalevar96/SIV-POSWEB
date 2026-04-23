@@ -9,6 +9,7 @@ import Estadisticas from './views/Estadisticas.jsx';
 import { supabase } from './lib/supabase.js';
 import { getOpenSession, closeCashSession } from './hooks/useCashSession.js';
 import CloseCashModal from './components/CloseCashModal.jsx';
+import CashMovementModal from './components/CashMovementModal.jsx';
 
 function detectViewport() {
   if (typeof window === 'undefined') return 'desktop';
@@ -132,6 +133,7 @@ export default function App() {
   }, []);
 
   const [closeModalOpen, setCloseModalOpen] = useState(false);
+  const [cashMoveOpen, setCashMoveOpen] = useState(false);
 
   // Interceptar LOGOUT para llamar a supabase.auth.signOut()
   const wrappedDispatch = (action) => {
@@ -140,6 +142,10 @@ export default function App() {
     }
     if (action.type === 'OPEN_CLOSE_CASH') {
       setCloseModalOpen(true);
+      return;
+    }
+    if (action.type === 'OPEN_CASH_MOVEMENT') {
+      setCashMoveOpen(true);
       return;
     }
     dispatch(action);
@@ -188,6 +194,12 @@ export default function App() {
             await supabase.auth.signOut();
             dispatch({ type: 'LOGOUT' });
           }}
+        />
+      )}
+      {cashMoveOpen && (
+        <CashMovementModal
+          state={state}
+          onCancel={()=>setCashMoveOpen(false)}
         />
       )}
     </div>

@@ -38,6 +38,9 @@ export default function Shell({ state, dispatch, children, onGo }) {
           <div className={`p-3 border-t border-white/10 ${isTablet?'flex justify-center':''}`}>
             {isTablet ? (
               <div className="flex flex-col gap-2">
+                <button onClick={()=>dispatch({type:'OPEN_CASH_MOVEMENT'})} title="Retiro / Ingreso" className="press w-11 h-11 rounded-xl flex items-center justify-center hover:bg-white/5" style={{color:'var(--mustard)'}}>
+                  <I.wallet size={20}/>
+                </button>
                 <button onClick={()=>dispatch({type:'OPEN_CLOSE_CASH'})} title="Cerrar caja" className="press w-11 h-11 rounded-xl flex items-center justify-center hover:bg-white/5" style={{color:'var(--tomato)'}}>
                   <I.cash size={20}/>
                 </button>
@@ -47,6 +50,11 @@ export default function Shell({ state, dispatch, children, onGo }) {
               </div>
             ) : (
               <>
+                <button onClick={()=>dispatch({type:'OPEN_CASH_MOVEMENT'})}
+                  className="press w-full h-10 mb-2 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold"
+                  style={{background:'rgba(240,190,50,0.15)', color:'var(--mustard)'}}>
+                  <I.wallet size={16}/> Retiro / Ingreso
+                </button>
                 <button onClick={()=>dispatch({type:'OPEN_CLOSE_CASH'})}
                   className="press w-full h-10 mb-2 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold"
                   style={{background:'rgba(220,60,40,0.12)', color:'var(--tomato)'}}>
@@ -144,6 +152,11 @@ export default function Shell({ state, dispatch, children, onGo }) {
                 })}
               </div>
               <div className="absolute bottom-0 left-0 right-0 p-5 border-t border-white/10 space-y-3">
+                <button onClick={()=>{ dispatch({type:'OPEN_CASH_MOVEMENT'}); setMenuOpen(false); }}
+                  className="press w-full h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold"
+                  style={{background:'rgba(240,190,50,0.18)', color:'var(--mustard)'}}>
+                  <I.wallet size={16}/> Retiro / Ingreso
+                </button>
                 <button onClick={()=>{ dispatch({type:'OPEN_CLOSE_CASH'}); setMenuOpen(false); }}
                   className="press w-full h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold"
                   style={{background:'rgba(220,60,40,0.15)', color:'var(--tomato)'}}>

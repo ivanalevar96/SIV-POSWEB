@@ -90,6 +90,24 @@ export const BY_CATEGORY = [
   { name: 'Extras',    value:   88000 },
 ];
 
+// Métodos de pago soportados — 'tarjeta' queda sólo por compatibilidad con ventas históricas
+export const PAYMENT_METHODS = [
+  { id: 'efectivo',      label: 'Efectivo',      color: 'mustard', cash: true  },
+  { id: 'debito',        label: 'Débito',        color: 'tomato',  cash: false },
+  { id: 'credito',       label: 'Crédito',       color: 'pickle',  cash: false },
+  { id: 'transferencia', label: 'Transferencia', color: 'ink',     cash: false },
+];
+
+// Label legible para cualquier valor de method (incluye legacy 'tarjeta')
+export function methodLabel(id) {
+  if (id === 'tarjeta') return 'Tarjeta';
+  return PAYMENT_METHODS.find(m => m.id === id)?.label || id || '—';
+}
+
+export function isCashMethod(id) {
+  return id === 'efectivo';
+}
+
 export function fmtCLP(n) {
   if (n == null || isNaN(n)) return '$0';
   const rounded = Math.round(n);
